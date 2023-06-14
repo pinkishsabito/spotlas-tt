@@ -1,0 +1,29 @@
+1. Return spots which have a domain with a count greater than 1:
+SELECT name, website
+FROM MY_TABLE
+WHERE website IN (
+    SELECT website
+    FROM MY_TABLE
+    GROUP BY website
+    HAVING COUNT(*) > 1
+);
+
+2. Change the website field, so it only contains the domain. Example: https://domain.com/index.php → domain.com:
+UPDATE MY_TABLE
+SET website = regexp_replace(website, '^https?://([^/?#]+).*$', '\1')
+WHERE website ~ '^https?://([^/?#]+).*';
+Note: The above query assumes that the website column contains URLs starting with either "http://" or "https://". If the URLs have a different format, the regular expression pattern may need to be adjusted accordingly.
+
+3. Count how many spots have the same domain:
+SELECT website, COUNT(*) AS count
+FROM MY_TABLE
+GROUP BY website;
+
+
+4. Return 3 columns: spot name, domain, and the count number for the domain:
+SELECT name, website, count
+FROM (
+    SELECT name, website, COUNT(*) OVER (PARTITION BY website) AS count
+    FROM MY_TABLE
+) AS subquery
+WHERE count > 1;
