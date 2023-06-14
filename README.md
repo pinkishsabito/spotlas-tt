@@ -29,6 +29,7 @@ The code also includes a `main_test.go` file with unit tests for the `calculateB
 To run the solution, follow these steps:
 
 1. Clone the repository:
+
 git clone https://github.com/username/repository.git
 
 2. Open a terminal and navigate to the cloned repository.
@@ -36,7 +37,9 @@ git clone https://github.com/username/repository.git
 3. Start the HTTP server: go run main.go
 
 4. Send a GET request to the `/spots` endpoint with the required parameters:
+
 http://localhost:8080/spots?latitude=40.7128&longitude=-74.0060&radius=1000&type=circle
+
 Replace the values for `latitude`, `longitude`, `radius`, and `type` as needed.
 
 5. The server will respond with a JSON array of spots that fall within the specified shape and radius.
@@ -52,8 +55,11 @@ The tests cover the `calculateBoundingBox`, `filterSpotsInCircle`, and `calculat
 The project structure is as follows:
 
 ├── main.go # Main code implementing the HTTP server and endpoint
+
 ├── main_test.go # Unit tests for the main code
+
 ├── queries.txt # SQL queries for Task 1
+
 ├── README.md # Project documentation (you are here)
 
 ## Contact
