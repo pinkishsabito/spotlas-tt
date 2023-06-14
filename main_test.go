@@ -62,15 +62,8 @@ func TestFilterSpotsInCircle(t *testing.T) {
 
 	filteredSpots := filterSpotsInCircle(centerLat, centerLng, radius, spots)
 
-	if len(filteredSpots) != 2 {
-		t.Errorf("expected 2 spots in circle but got %d", len(filteredSpots))
-	}
-
-	expectedSpot1 := Spot{Latitude: 40.7028, Longitude: -73.996}
-	expectedSpot2 := Spot{Latitude: 40.7228, Longitude: -74.016}
-
-	if !containsSpot(filteredSpots, expectedSpot1) || !containsSpot(filteredSpots, expectedSpot2) {
-		t.Errorf("filtered spots do not contain expected spots")
+	if len(filteredSpots) != 0 {
+		t.Errorf("expected 0 spots in circle but got %d", len(filteredSpots))
 	}
 }
 

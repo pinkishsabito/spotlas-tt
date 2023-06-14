@@ -87,12 +87,11 @@ func generateSpots(minLat, maxLat, minLng, maxLng float64) []Spot {
 	return spots
 }
 
-func filterSpotsInCircle(latitude, longitude, radius float64, spots []Spot) []Spot {
-	var spotsInCircle []Spot
+func filterSpotsInCircle(centerLat, centerLng, radius float64, spots []Spot) []Spot {
+	spotsInCircle := make([]Spot, 0)
 
 	for _, spot := range spots {
-		// Calculate the distance between the spot and the center point
-		distance := calculateDistance(latitude, longitude, spot.Latitude, spot.Longitude)
+		distance := calculateDistance(centerLat, centerLng, spot.Latitude, spot.Longitude)
 
 		// Check if the spot is within the circle
 		if distance <= radius {
@@ -110,7 +109,7 @@ func calculateDistance(lat1, lng1, lat2, lng2 float64) float64 {
 	lng1Rad := lng1 * (math.Pi / 180)
 	lng2Rad := lng2 * (math.Pi / 180)
 
-	// Calculate the differences between coordinates
+	// Calculate the differences between coordinates in radians
 	deltaLat := lat2Rad - lat1Rad
 	deltaLng := lng2Rad - lng1Rad
 
