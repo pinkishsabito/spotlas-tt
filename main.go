@@ -27,9 +27,9 @@ type Spot struct {
 const (
 	host     = "localhost"
 	port     = 5432
-	user     = "your_username"
-	password = "your_password"
-	dbname   = "your_database"
+	user     = "username"
+	password = "password"
+	dbname   = "database"
 )
 
 // GetSpotsHandler handles the GET /spots endpoint

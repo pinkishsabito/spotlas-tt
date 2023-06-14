@@ -1,88 +1,130 @@
-package main
+package main_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetSpotsHandler(t *testing.T) {
-	// Create a mock database connection
-	db := &mockDB{}
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		GetSpotsHandler(w, r, db)
-	})
-
-	// Create a sample request with test parameters
-	req, err := http.NewRequest("GET", "/spots?latitude=12.34&longitude=56.78&radius=100&type=circle", nil)
+	req, err := http.NewRequest("GET", "/spots", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Set the expected spots to be returned by the mock DB
-	expectedSpots := []Spot{
+	q := req.URL.Query()
+	q.Add("latitude", "10.12345")
+	q.Add("longitude", "20.54321")
+	q.Add("radius", "100")
+	q.Add("type", "circle")
+	req.URL.RawQuery = q.Encode()
+
+	rr := httptest.NewRecorder()
+
+	router := mux.NewRouter()
+	router.HandleFunc("/spots", main.GetSpotsHandler).Methods("GET")
+
+	router.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	var spots []main.Spot
+	err = json.Unmarshal(rr.Body.Bytes(), &spots)
+	assert.NoError(t, err, "Error unmarshaling JSON response")
+
+	assert.Equal(t, 2, len(spots), "Unexpected number of spots returned")
+
+	assert.Equal(t, "Spot 1", spots[0].Name, "Unexpected spot name")
+	assert.Equal(t, "http://example.com", spots[0].Website, "Unexpected spot website")
+	assert.Equal(t, "10.12345,20.54321", spots[0].Coordinates, "Unexpected spot coordinates")
+	assert.Equal(t, "Description 1", spots[0].Description, "Unexpected spot description")
+	assert.Equal(t, 4.5, spots[0].Rating, "Unexpected spot rating")
+}
+
+func TestSortSpots(t *testing.T) {
+	spots := []main.Spot{
 		{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			ID:          uuid.NewV4(),
 			Name:        "Spot 1",
-			Website:     "https://www.spot1.com",
-			Coordinates: "POINT(12.34 56.78)",
-			Description: "Spot 1 description",
+			Website:     "http://example.com",
+			Coordinates: "10.12345,20.54321",
+			Description: "Description 1",
 			Rating:      4.5,
 		},
 		{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			ID:          uuid.NewV4(),
 			Name:        "Spot 2",
-			Website:     "https://www.spot2.com",
-			Coordinates: "POINT(12.35 56.79)",
-			Description: "Spot 2 description",
-			Rating:      3.8,
+			Website:     "http://example.com",
+			Coordinates: "10.6789,20.9876",
+			Description: "Description 2",
+			Rating:      3.2,
 		},
 	}
-	db.MockGetSpots = func(lat, lon, radius float64) ([]Spot, error) {
-		return expectedSpots, nil
-	}
 
-	// Perform the request
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	main.SortSpots(10.12345, 20.54321, spots)
 
-	// Check the response status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v, want %v", status, http.StatusOK)
-	}
-
-	// Check the response content type
-	expectedContentType := "application/json"
-	if ct := rr.Header().Get("Content-Type"); ct != expectedContentType {
-		t.Errorf("handler returned wrong content type: got %v, want %v", ct, expectedContentType)
-	}
-
-	// Parse the response JSON into Spot objects
-	var responseSpots []Spot
-	err = json.Unmarshal(rr.Body.Bytes(), &responseSpots)
-	if err != nil {
-		t.Fatalf("error parsing response JSON: %v", err)
-	}
-
-	// Compare the response spots with the expected spots
-	if !reflect.DeepEqual(responseSpots, expectedSpots) {
-		t.Errorf("handler returned unexpected spots: got %v, want %v", responseSpots, expectedSpots)
-	}
+	assert.Equal(t, "Spot 1", spots[0].Name, "Unexpected spot order")
+	assert.Equal(t, "Spot 2", spots[1].Name, "Unexpected spot order")
 }
 
-// mockDB implements the DB interface with mock methods
-type mockDB struct {
-	MockGetSpots func(lat, lon, radius float64) ([]Spot, error)
+func TestDistance(t *testing.T) {
+	// Create some test spots
+	spots := []main.Spot{
+		{
+			ID:          uuid.NewV4(),
+			Name:        "Spot 1",
+			Website:     "http://example.com",
+			Coordinates: "10.12345,20.54321",
+			Description: "Description 1",
+			Rating:      4.5,
+		},
+		{
+			ID:          uuid.NewV4(),
+			Name:        "Spot 2",
+			Website:     "http://example.com",
+			Coordinates: "10.6789,20.9876",
+			Description: "Description 2",
+			Rating:      3.2,
+		},
+	}
+
+	distance := main.Distance(spots[0], spots[1])
+
+	expectedDistance := 0.0
+	assert.InEpsilon(t, expectedDistance, distance, 0.0001, "Unexpected distance value")
 }
 
-// GetSpots retrieves spots from the mock database
-func (db *mockDB) GetSpots(lat, lon, radius float64) ([]Spot, error) {
-	if db.MockGetSpots != nil {
-		return db.MockGetSpots(lat, lon, radius)
+func TestSortBy(t *testing.T) {
+	spots := []main.Spot{
+		{
+			ID:          uuid.NewV4(),
+			Name:        "Spot 1",
+			Website:     "http://example.com",
+			Coordinates: "10.12345,20.54321",
+			Description: "Description 1",
+			Rating:      4.5,
+		},
+		{
+			ID:          uuid.NewV4(),
+			Name:        "Spot 2",
+			Website:     "http://example.com",
+			Coordinates: "10.6789,20.9876",
+			Description: "Description 2",
+			Rating:      3.2,
+		},
 	}
-	return nil, nil
+
+	byRating := func(i, j int) bool {
+		return spots[i].Rating > spots[j].Rating
+	}
+
+	main.SortBy(byRating).Sort(spots)
+
+	assert.Equal(t, "Spot 1", spots[0].Name, "Unexpected spot order")
+	assert.Equal(t, "Spot 2", spots[1].Name, "Unexpected spot order")
 }
