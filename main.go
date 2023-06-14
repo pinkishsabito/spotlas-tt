@@ -1,176 +1,140 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
-	"sort"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
-	"github.com/satori/go.uuid"
 )
 
-// Spot represents a spot in the database
+const (
+	earthRadius = 6371000 // Earth radius in meters
+)
+
 type Spot struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Website     string    `json:"website"`
-	Coordinates string    `json:"coordinates"`
-	Description string    `json:"description"`
-	Rating      float64   `json:"rating"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 }
 
-// Database connection parameters
-const (
-	host     = "localhost"
-	port     = 5432
-	user     = "username"
-	password = "password"
-	dbname   = "database"
-)
+func main() {
+	http.HandleFunc("/spots", getSpotsHandler)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
 
-// GetSpotsHandler handles the GET /spots endpoint
-func GetSpotsHandler(w http.ResponseWriter, r *http.Request) {
-	// Retrieve the query parameters
-	latStr := r.URL.Query().Get("latitude")
-	lonStr := r.URL.Query().Get("longitude")
+func getSpotsHandler(w http.ResponseWriter, r *http.Request) {
+	latitudeStr := r.URL.Query().Get("latitude")
+	longitudeStr := r.URL.Query().Get("longitude")
 	radiusStr := r.URL.Query().Get("radius")
-	recruitmentType := r.URL.Query().Get("type")
 
-	// Parse query parameters
-	lat, err := strconv.ParseFloat(latStr, 64)
+	latitude, err := strconv.ParseFloat(latitudeStr, 64)
 	if err != nil {
 		http.Error(w, "Invalid latitude", http.StatusBadRequest)
 		return
 	}
-	lon, err := strconv.ParseFloat(lonStr, 64)
+
+	longitude, err := strconv.ParseFloat(longitudeStr, 64)
 	if err != nil {
 		http.Error(w, "Invalid longitude", http.StatusBadRequest)
 		return
 	}
+
 	radius, err := strconv.ParseFloat(radiusStr, 64)
-	if err != nil {
+	if err != nil || radius <= 0 {
 		http.Error(w, "Invalid radius", http.StatusBadRequest)
 		return
 	}
 
-	// Connect to the database
-	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname))
-	if err != nil {
-		log.Fatal(err)
+	// Calculate the bounding box coordinates based on the circle's radius
+	minLat, maxLat, minLng, maxLng := calculateBoundingBox(latitude, longitude, radius)
+
+	// Alternatively, you can use the calculateBoundingBoxSquare function for a square area
+	// minLat, maxLat, minLng, maxLng := calculateBoundingBoxSquare(latitude, longitude, radius)
+
+	// Generate some example spots within the bounding box
+	spots := generateSpots(minLat, maxLat, minLng, maxLng)
+
+	// Filter the spots within the circle
+	spotsInCircle := filterSpotsInCircle(latitude, longitude, radius, spots)
+
+	// Return the spots within the circle as a response
+	fmt.Fprintf(w, "%+v", spotsInCircle)
+}
+
+func calculateBoundingBox(latitude, longitude, radius float64) (float64, float64, float64, float64) {
+	// Convert radius from meters to degrees
+	radiusInDegrees := radius / earthRadius * (180 / math.Pi)
+
+	// Calculate the coordinates for the bounding box
+	minLat := latitude - radiusInDegrees
+	maxLat := latitude + radiusInDegrees
+	minLng := longitude - radiusInDegrees
+	maxLng := longitude + radiusInDegrees
+
+	return minLat, maxLat, minLng, maxLng
+}
+
+func calculateBoundingBoxSquare(latitude, longitude, radius float64) (float64, float64, float64, float64) {
+	// Convert radius from meters to degrees
+	radiusInDegrees := radius / earthRadius * (180 / math.Pi)
+
+	// Calculate the coordinates for the square bounding box
+	minLat := latitude - radiusInDegrees
+	maxLat := latitude + radiusInDegrees
+	minLng := longitude - radiusInDegrees
+	maxLng := longitude + radiusInDegrees
+
+	return minLat, maxLat, minLng, maxLng
+}
+
+func generateSpots(minLat, maxLat, minLng, maxLng float64) []Spot {
+	// Here, you can implement your own logic to generate spots within the bounding box.
+	// For simplicity, let's generate some example spots within the specified range.
+
+	spots := []Spot{
+		{Latitude: minLat + 0.01, Longitude: minLng + 0.01},
+		{Latitude: minLat + 0.02, Longitude: minLng + 0.02},
+		{Latitude: minLat + 0.03, Longitude: minLng + 0.03},
+		{Latitude: maxLat - 0.01, Longitude: maxLng - 0.01},
+		{Latitude: maxLat - 0.02, Longitude: maxLng - 0.02},
 	}
-	defer db.Close()
 
-	// Query the database to get spots within the specified area
-	var spots []Spot
-	var query string
+	return spots
+}
 
-	switch recruitmentType {
-	case "circle":
-		query = "SELECT * FROM MY_TABLE WHERE ST_DWithin(coordinates, ST_SetSRID(ST_MakePoint($1, $2), 4326), $3)"
-	case "square":
-		query = "SELECT * FROM MY_TABLE WHERE coordinates && ST_MakeEnvelope($1-$3/111320, $2-$3/111320, $1+$3/111320, $2+$3/111320, 4326)"
-	default:
-		http.Error(w, "Invalid recruitment type", http.StatusBadRequest)
-		return
-	}
+func filterSpotsInCircle(latitude, longitude, radius float64, spots []Spot) []Spot {
+	var spotsInCircle []Spot
 
-	rows, err := db.Query(query, lon, lat, radius)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
+	for _, spot := range spots {
+		// Calculate the distance between the spot and the center point
+		distance := calculateDistance(latitude, longitude, spot.Latitude, spot.Longitude)
 
-	// Iterate over the result rows and populate the spots slice
-	for rows.Next() {
-		var spot Spot
-		err := rows.Scan(&spot.ID, &spot.Name, &spot.Website, &spot.Coordinates, &spot.Description, &spot.Rating)
-		if err != nil {
-			log.Fatal(err)
+		// Check if the spot is within the circle
+		if distance <= radius {
+			spotsInCircle = append(spotsInCircle, spot)
 		}
-		spots = append(spots, spot)
-	}
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
 	}
 
-	// Sort the spots by distance and rating if distance is smaller than 50m
-	sortSpots(lat, lon, spots)
-
-	// Convert the spots slice to JSON
-	jsonData, err := json.Marshal(spots)
-	if err != nil {
-		http.Error(w, "Error converting spots to JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Set the response headers and write the JSON data
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonData)
+	return spotsInCircle
 }
 
-// Sorts the spots by distance and rating if distance is smaller than 50m
-func sortSpots(lat, lon float64, spots []Spot) {
-	distance := func(spot Spot) float64 {
-		// TODO: Calculate the distance between lat/lon and spot.Coordinates
-		// Implement your own distance calculation method here
-		return 0
-	}
+func calculateDistance(lat1, lng1, lat2, lng2 float64) float64 {
+	// Convert latitude and longitude from degrees to radians
+	lat1Rad := lat1 * (math.Pi / 180)
+	lat2Rad := lat2 * (math.Pi / 180)
+	lng1Rad := lng1 * (math.Pi / 180)
+	lng2Rad := lng2 * (math.Pi / 180)
 
-	distanceComparator := func(i, j int) bool {
-		distI := distance(spots[i])
-		distJ := distance(spots[j])
+	// Calculate the differences between coordinates
+	deltaLat := lat2Rad - lat1Rad
+	deltaLng := lng2Rad - lng1Rad
 
-		if distI < 50 && distJ < 50 {
-			return spots[i].Rating > spots[j].Rating
-		}
+	// Calculate the central angle between the points using the Haversine formula
+	a := math.Pow(math.Sin(deltaLat/2), 2) + math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Pow(math.Sin(deltaLng/2), 2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 
-		return distI < distJ
-	}
+	// Calculate the distance using the Earth's radius
+	distance := earthRadius * c
 
-	// Sort the spots using the custom distanceComparator
-	SortBy(distanceComparator).Sort(spots)
-}
-
-// SortBy is a generic type that allows sorting slices using a custom comparator
-type SortBy func(i, j int) bool
-
-// Sort sorts the slice using the custom comparator
-func (by SortBy) Sort(slice []Spot) {
-	sorter := &sorter{
-		slice: slice,
-		by:    by,
-	}
-	sort.Sort(sorter)
-}
-
-type sorter struct {
-	slice []Spot
-	by    func(i, j int) bool
-}
-
-func (s *sorter) Len() int {
-	return len(s.slice)
-}
-
-func (s *sorter) Swap(i, j int) {
-	s.slice[i], s.slice[j] = s.slice[j], s.slice[i]
-}
-
-func (s *sorter) Less(i, j int) bool {
-	return s.by(i, j)
-}
-
-func main() {
-	r := mux.NewRouter()
-	r.HandleFunc("/spots", GetSpotsHandler).Methods("GET")
-
-	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	return distance
 }
