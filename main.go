@@ -10,6 +10,7 @@ import (
 
 const (
 	earthRadius = 6371000 // Earth radius in meters
+	tolerance   = 0.000001 // Tolerance value for floating-point comparisons
 )
 
 type Spot struct {
@@ -48,9 +49,6 @@ func getSpotsHandler(w http.ResponseWriter, r *http.Request) {
 	// Calculate the bounding box coordinates based on the circle's radius
 	minLat, maxLat, minLng, maxLng := calculateBoundingBox(latitude, longitude, radius)
 
-	// Alternatively, you can use the calculateBoundingBoxSquare function for a square area
-	// minLat, maxLat, minLng, maxLng := calculateBoundingBoxSquare(latitude, longitude, radius)
-
 	// Generate some example spots within the bounding box
 	spots := generateSpots(minLat, maxLat, minLng, maxLng)
 
@@ -66,19 +64,6 @@ func calculateBoundingBox(latitude, longitude, radius float64) (float64, float64
 	radiusInDegrees := radius / earthRadius * (180 / math.Pi)
 
 	// Calculate the coordinates for the bounding box
-	minLat := latitude - radiusInDegrees
-	maxLat := latitude + radiusInDegrees
-	minLng := longitude - radiusInDegrees
-	maxLng := longitude + radiusInDegrees
-
-	return minLat, maxLat, minLng, maxLng
-}
-
-func calculateBoundingBoxSquare(latitude, longitude, radius float64) (float64, float64, float64, float64) {
-	// Convert radius from meters to degrees
-	radiusInDegrees := radius / earthRadius * (180 / math.Pi)
-
-	// Calculate the coordinates for the square bounding box
 	minLat := latitude - radiusInDegrees
 	maxLat := latitude + radiusInDegrees
 	minLng := longitude - radiusInDegrees

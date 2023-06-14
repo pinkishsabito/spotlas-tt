@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-const tolerance = 0.000001 // Tolerance value for floating-point comparisons
-
 func TestGetSpotsHandler(t *testing.T) {
 	req, err := http.NewRequest("GET", "/spots?latitude=40.7128&longitude=-74.0060&radius=1000", nil)
 	if err != nil {
@@ -42,10 +40,10 @@ func TestCalculateBoundingBox(t *testing.T) {
 	expectedMinLng := -74.014993
 	expectedMaxLng := -73.997007
 
-	if !floatEquals(minLat, expectedMinLat, tolerance) ||
-		!floatEquals(maxLat, expectedMaxLat, tolerance) ||
-		!floatEquals(minLng, expectedMinLng, tolerance) ||
-		!floatEquals(maxLng, expectedMaxLng, tolerance) {
+	if !floatEquals(minLat, expectedMinLat) ||
+		!floatEquals(maxLat, expectedMaxLat) ||
+		!floatEquals(minLng, expectedMinLng) ||
+		!floatEquals(maxLng, expectedMaxLng) {
 		t.Errorf("expected bounding box coordinates (%f, %f, %f, %f) but got (%f, %f, %f, %f)",
 			expectedMinLat, expectedMaxLat, expectedMinLng, expectedMaxLng, minLat, maxLat, minLng, maxLng)
 	}
@@ -64,7 +62,7 @@ func TestFilterSpotsInCircle(t *testing.T) {
 
 	filteredSpots := filterSpotsInCircle(centerLat, centerLng, radius, spots)
 
-	if len(filteredSpots) != 0 {
+	if len(filteredSpots) != 2 {
 		t.Errorf("expected 2 spots in circle but got %d", len(filteredSpots))
 	}
 
@@ -78,14 +76,12 @@ func TestFilterSpotsInCircle(t *testing.T) {
 
 func containsSpot(spots []Spot, target Spot) bool {
 	for _, spot := range spots {
-		if floatEquals(spot.Latitude, target.Latitude, tolerance) &&
-			floatEquals(spot.Longitude, target.Longitude, tolerance) {
+		if spot.Latitude == target.Latitude && spot.Longitude == target.Longitude {
 			return true
 		}
 	}
 	return false
 }
-
 
 func TestCalculateDistance(t *testing.T) {
 	lat1 := 40.7128
@@ -97,11 +93,11 @@ func TestCalculateDistance(t *testing.T) {
 
 	distance := calculateDistance(lat1, lng1, lat2, lng2)
 
-	if !floatEquals(distance, expectedDistance, tolerance) {
+	if !floatEquals(distance, expectedDistance) {
 		t.Errorf("expected distance %f but got %f", expectedDistance, distance)
 	}
 }
 
-func floatEquals(a, b, tolerance float64) bool {
-	return math.Abs(a-b) <= tolerance
+func floatEquals(a, b float64) bool {
+	return math.Abs(a-b) < 0.000001
 }
