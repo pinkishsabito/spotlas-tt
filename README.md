@@ -64,6 +64,6 @@ The project structure is as follows:
 
 ## Contact
 
-If you have any questions or need further assistance, please contact me at [wasil@spotlas.com](mailto:wasil@spotlas.com).
+If you have any questions or need further assistance, please contact me at [ozhetov.arsen@gmail.com](mailto:ozhetov.arsen@gmail.com).
 
 Thank you!
